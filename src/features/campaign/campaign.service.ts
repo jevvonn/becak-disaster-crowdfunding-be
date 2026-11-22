@@ -11,6 +11,7 @@ import {
   CampaignStatus,
   CreateCampaignRequest,
   OnchainCampaign,
+  PublicDonation,
   RejectCampaignRequest,
   UpdateCampaignRequest,
 } from "./campaign.model";
@@ -142,7 +143,36 @@ export async function getCampaign(id: string): Promise<CampaignDetailResponse> {
     throw new HttpError(404, "Campaign not found", `No campaign found with id ${id}`);
   }
 
-  return { ...toCampaignResponse(campaign), onchain: await fetchOnchainCampaign(campaign) };
+  const [onchain, donations] = await Promise.all([fetchOnchainCampaign(campaign), getPublicDonations(campaign.id)]);
+
+  return { ...toCampaignResponse(campaign), onchain, donations };
+}
+
+function anonymizeName(name: string): string {
+  return `${name.trim().charAt(0).toUpperCase() || "*"}****`;
+}
+
+async function getPublicDonations(campaignId: string): Promise<PublicDonation[]> {
+  const donations = await prisma.transaction.findMany({
+    where: { campaignId, type: "DONATION", status: "COMPLETED" },
+    include: { user: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return donations.map((donation) => {
+    const amountWei = donation.amountWei?.toFixed() ?? "0";
+
+    return {
+      donor_name: anonymizeName(donation.user.name),
+      amount_eth: weiToEth(amountWei),
+      amount_wei: amountWei,
+      tx_hash: donation.txHashSepolia,
+      tx_url: donation.txHashSepolia ? getExplorerTxUrl(donation.txHashSepolia) : null,
+      transfer_tx_hash: donation.transferTxHash,
+      transfer_tx_url: donation.transferTxHash ? getExplorerTxUrl(donation.transferTxHash) : null,
+      donated_at: donation.createdAt,
+    };
+  });
 }
 
 export async function createCampaign(body: CreateCampaignRequest, email: string): Promise<CampaignResponse> {

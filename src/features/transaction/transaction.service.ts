@@ -21,6 +21,8 @@ export function toTransactionResponse(transaction: Transaction): TransactionResp
     status: transaction.status as TransactionStatus,
     tx_hash: transaction.txHashSepolia,
     tx_url: transaction.txHashSepolia ? getExplorerTxUrl(transaction.txHashSepolia) : null,
+    transfer_tx_hash: transaction.transferTxHash,
+    transfer_tx_url: transaction.transferTxHash ? getExplorerTxUrl(transaction.transferTxHash) : null,
     failure_reason: transaction.failureReason,
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,

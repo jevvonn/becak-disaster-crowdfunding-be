@@ -96,6 +96,18 @@ export interface OnchainCampaign {
   tx_url_create: string | null;
 }
 
+export interface PublicDonation {
+  donor_name: string;
+  amount_eth: string;
+  amount_wei: string;
+  tx_hash: string | null;
+  tx_url: string | null;
+  transfer_tx_hash: string | null;
+  transfer_tx_url: string | null;
+  donated_at: Date;
+}
+
 export interface CampaignDetailResponse extends CampaignResponse {
   onchain: OnchainCampaign | null;
+  donations: PublicDonation[];
 }

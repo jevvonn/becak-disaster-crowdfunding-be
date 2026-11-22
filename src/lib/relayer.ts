@@ -1,3 +1,4 @@
+import { Wallet } from "ethers";
 import { getProvider, getReadContract, getRelayerContract, getRelayerSigner } from "../config/blockchain";
 import { config } from "../config/config";
 import { HttpError } from "./http-error";
@@ -91,6 +92,62 @@ export async function sendEth(to: string, valueWei: bigint) {
       throw new HttpError(502, "ETH transfer failed", getErrorReason(error));
     }
   });
+}
+
+const TRANSFER_GAS_LIMIT = 21000n;
+const walletQueues = new Map<string, Promise<unknown>>();
+
+function enqueueForWallet<T>(address: string, task: () => Promise<T>): Promise<T> {
+  const previous = walletQueues.get(address) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  const settled = run.catch(() => undefined);
+  walletQueues.set(address, settled);
+  settled.then(() => {
+    if (walletQueues.get(address) === settled) {
+      walletQueues.delete(address);
+    }
+  });
+  return run;
+}
+
+export async function getTransferGasFee(): Promise<bigint> {
+  try {
+    const feeData = await getProvider().getFeeData();
+    const perGas = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
+    return (TRANSFER_GAS_LIMIT * perGas * (100n + GAS_LIMIT_BUFFER_PERCENT)) / 100n;
+  } catch (error) {
+    throw new HttpError(502, "Blockchain read failed", getErrorReason(error));
+  }
+}
+
+export function sendEthFromWallet(privateKey: string, to: string, valueWei: bigint) {
+  const wallet = new Wallet(privateKey, getProvider());
+
+  return enqueueForWallet(wallet.address, async () => {
+    try {
+      const tx = await wallet.sendTransaction({ to, value: valueWei, gasLimit: TRANSFER_GAS_LIMIT });
+      const receipt = await tx.wait();
+
+      if (!receipt || receipt.status !== 1) {
+        throw new Error("ETH transfer reverted");
+      }
+
+      return { txHash: receipt.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      throw new HttpError(502, "ETH transfer failed", getErrorReason(error));
+    }
+  });
+}
+
+export interface RecordDonationParams {
+  campaignId: bigint;
+  donorWallet: string;
+  amountWei: bigint;
+  orderId: string;
+}
+
+export function recordDonationOnChain({ campaignId, donorWallet, amountWei, orderId }: RecordDonationParams) {
+  return sendTransaction("donateToCampaign", [campaignId, donorWallet, amountWei, orderId]);
 }
 
 export async function getEthBalance(address: string): Promise<bigint> {

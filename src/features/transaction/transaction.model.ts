@@ -25,6 +25,8 @@ export interface TransactionResponse {
   status: TransactionStatus;
   tx_hash: string | null;
   tx_url: string | null;
+  transfer_tx_hash: string | null;
+  transfer_tx_url: string | null;
   failure_reason: string | null;
   created_at: Date;
   updated_at: Date;

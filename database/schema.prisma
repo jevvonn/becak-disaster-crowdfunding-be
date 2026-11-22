@@ -98,20 +98,21 @@ model Campaign {
 }
 
 model Transaction {
-  id            String            @id @default(uuid())
-  orderId       String            @unique @map("order_id") @db.VarChar(50)
-  type          TransactionType
-  userId        String            @map("user_id")
-  campaignId    String?           @map("campaign_id")
-  amount        Decimal           @db.Decimal(15, 2)
-  amountWei     Decimal?          @map("amount_wei") @db.Decimal(78, 0)
-  paymentType   String?           @map("payment_type") @db.VarChar(30)
-  paymentUrl    String?           @map("payment_url")
-  status        TransactionStatus @default(PENDING)
-  txHashSepolia String?           @unique @map("tx_hash_sepolia") @db.VarChar(66)
-  failureReason String?           @map("failure_reason")
-  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String            @id @default(uuid())
+  orderId        String            @unique @map("order_id") @db.VarChar(50)
+  type           TransactionType
+  userId         String            @map("user_id")
+  campaignId     String?           @map("campaign_id")
+  amount         Decimal           @db.Decimal(15, 2)
+  amountWei      Decimal?          @map("amount_wei") @db.Decimal(78, 0)
+  paymentType    String?           @map("payment_type") @db.VarChar(30)
+  paymentUrl     String?           @map("payment_url")
+  status         TransactionStatus @default(PENDING)
+  txHashSepolia  String?           @unique @map("tx_hash_sepolia") @db.VarChar(66)
+  transferTxHash String?           @unique @map("transfer_tx_hash") @db.VarChar(66)
+  failureReason  String?           @map("failure_reason")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Restrict)
