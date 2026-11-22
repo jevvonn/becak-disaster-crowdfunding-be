@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  DONOR
+  INITIATOR
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum CampaignStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  COMPLETED
+
+  @@map("campaign_status")
+}
+
+enum TransactionType {
+  TOPUP
+  DONATION
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  PENDING
+  SETTLEMENT
+  COMPLETED
+  EXPIRE
+  FAILED
+  ONCHAIN_FAILED
+
+  @@map("transaction_status")
+}
+
+enum DisbursementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  ONCHAIN_FAILED
+
+  @@map("disbursement_status")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  name                String   @db.VarChar(100)
+  email               String   @unique @db.VarChar(100)
+  password            String   @db.VarChar(255)
+  role                UserRole @default(DONOR)
+  walletAddress       String   @unique @map("wallet_address") @db.VarChar(42)
+  privateKeyEncrypted String   @map("private_key_encrypted")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  campaigns              Campaign[]
+  transactions           Transaction[]
+  disbursementsRequested Disbursement[] @relation("DisbursementRequestedBy")
+  disbursementsReviewed  Disbursement[] @relation("DisbursementReviewedBy")
+
+  @@map("users")
+}
+
+model Campaign {
+  id                         String         @id @default(uuid())
+  onchainId                  BigInt         @unique @default(autoincrement()) @map("onchain_id")
+  title                      String         @db.VarChar(150)
+  description                String         @db.Text
+  imageUrl                   String         @map("image_url")
+  targetAmountWei            Decimal        @map("target_amount_wei") @db.Decimal(78, 0)
+  currentAmountWei           Decimal        @default(0) @map("current_amount_wei") @db.Decimal(78, 0)
+  campaignWallet             String         @unique @map("campaign_wallet") @db.VarChar(42)
+  campaignWalletKeyEncrypted String         @map("campaign_wallet_key_encrypted")
+  initiatorId                String         @map("initiator_id")
+  status                     CampaignStatus @default(PENDING)
+  rejectionReason            String?        @map("rejection_reason")
+  txHashCreate               String?        @map("tx_hash_create") @db.VarChar(66)
+  txHashClose                String?        @map("tx_hash_close") @db.VarChar(66)
+  createdAt                  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  initiator     User           @relation(fields: [initiatorId], references: [id], onDelete: Restrict)
+  transactions  Transaction[]
+  disbursements Disbursement[]
+
+  @@index([initiatorId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  orderId       String            @unique @map("order_id") @db.VarChar(50)
+  type          TransactionType
+  userId        String            @map("user_id")
+  campaignId    String?           @map("campaign_id")
+  amount        Decimal           @db.Decimal(15, 2)
+  amountWei     Decimal?          @map("amount_wei") @db.Decimal(78, 0)
+  paymentType   String?           @map("payment_type") @db.VarChar(30)
+  status        TransactionStatus @default(PENDING)
+  txHashSepolia String?           @unique @map("tx_hash_sepolia") @db.VarChar(66)
+  failureReason String?           @map("failure_reason")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([campaignId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("transactions")
+}
+
+model Disbursement {
+  id              String             @id @default(uuid())
+  campaignId      String             @map("campaign_id")
+  requestedById   String             @map("requested_by")
+  reviewedById    String?            @map("reviewed_by")
+  amount          Decimal            @db.Decimal(15, 2)
+  amountWei       Decimal?           @map("amount_wei") @db.Decimal(78, 0)
+  description     String?
+  proofUrl        String             @map("proof_url")
+  status          DisbursementStatus @default(PENDING)
+  rejectionReason String?            @map("rejection_reason")
+  txHashSepolia   String?            @unique @map("tx_hash_sepolia") @db.VarChar(66)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  requestedBy User     @relation("DisbursementRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?    @relation("DisbursementReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([campaignId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("disbursements")
+}

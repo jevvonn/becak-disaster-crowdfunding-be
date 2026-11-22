@@ -5,4 +5,16 @@ export const config = {
     port: Number(process.env.APP_PORT) || 3000,
     url: process.env.APP_URL || "http://localhost:3000",
   },
+  db: {
+    host: process.env.DB_HOST || "localhost",
+    port: Number(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER || "",
+    password: process.env.DB_PASSWORD || "",
+    name: process.env.DB_NAME || "",
+    url: process.env.DB_URL || "",
+  },
+  defaultAdmin: {
+    email: process.env.DEFAULT_ADMIN_EMAIL || "",
+    password: process.env.DEFAULT_ADMIN_PASSWORD || "",
+  },
 };
