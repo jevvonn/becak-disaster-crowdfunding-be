@@ -24,6 +24,15 @@ export const config = {
     walletEncryptionKey: process.env.WALLET_ENCRYPTION_KEY || "",
     explorerBaseUrl: process.env.EXPLORER_BASE_URL || "https://sepolia.etherscan.io",
   },
+  midtrans: {
+    serverKey: process.env.MIDTRANS_SERVER_KEY || "",
+    clientKey: process.env.MIDTRANS_CLIENT_KEY || "",
+    signatureKey: process.env.MIDTRANS_SIGNATURE_KEY || "",
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  },
+  exchange: {
+    idrPerEth: BigInt(process.env.IDR_PER_ETH || "10000000"),
+  },
   defaultAdmin: {
     email: process.env.DEFAULT_ADMIN_EMAIL || "",
     password: process.env.DEFAULT_ADMIN_PASSWORD || "",

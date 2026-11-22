@@ -63,6 +63,44 @@ async function sendTransaction(method: string, args: unknown[]) {
   });
 }
 
+export async function sendEth(to: string, valueWei: bigint) {
+  return enqueue(async () => {
+    try {
+      const signer = getRelayerSigner();
+      const balance = await getProvider().getBalance(await signer.getAddress());
+
+      if (balance < valueWei) {
+        throw new HttpError(503, "Relayer balance insufficient", "Relayer wallet does not have enough ETH");
+      }
+
+      const tx = await signer.sendTransaction({ to, value: valueWei });
+      const receipt = await tx.wait();
+
+      if (!receipt || receipt.status !== 1) {
+        throw new Error("ETH transfer reverted");
+      }
+
+      return { txHash: receipt.hash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      if (isNonceError(error)) {
+        getRelayerSigner().reset();
+      }
+      throw new HttpError(502, "ETH transfer failed", getErrorReason(error));
+    }
+  });
+}
+
+export async function getEthBalance(address: string): Promise<bigint> {
+  try {
+    return await getProvider().getBalance(address);
+  } catch (error) {
+    throw new HttpError(502, "Blockchain read failed", getErrorReason(error));
+  }
+}
+
 export interface CreateCampaignOnChainParams {
   campaignId: bigint;
   title: string;

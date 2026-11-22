@@ -106,6 +106,7 @@ model Transaction {
   amount        Decimal           @db.Decimal(15, 2)
   amountWei     Decimal?          @map("amount_wei") @db.Decimal(78, 0)
   paymentType   String?           @map("payment_type") @db.VarChar(30)
+  paymentUrl    String?           @map("payment_url")
   status        TransactionStatus @default(PENDING)
   txHashSepolia String?           @unique @map("tx_hash_sepolia") @db.VarChar(66)
   failureReason String?           @map("failure_reason")
