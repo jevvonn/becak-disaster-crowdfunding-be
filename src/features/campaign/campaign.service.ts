@@ -3,7 +3,7 @@ import { getExplorerTxUrl } from "../../config/blockchain";
 import { prisma } from "../../config/prisma";
 import { ethToWei, weiToEth } from "../../lib/eth";
 import { HttpError } from "../../lib/http-error";
-import { createCampaignOnChain, getCampaignOnChain } from "../../lib/relayer";
+import { closeCampaignOnChain, createCampaignOnChain, getCampaignOnChain } from "../../lib/relayer";
 import { generateWallet } from "../../lib/wallet";
 import {
   CampaignDetailResponse,
@@ -11,6 +11,7 @@ import {
   CampaignStatus,
   CreateCampaignRequest,
   OnchainCampaign,
+  PublicDisbursement,
   PublicDonation,
   RejectCampaignRequest,
   UpdateCampaignRequest,
@@ -143,9 +144,96 @@ export async function getCampaign(id: string): Promise<CampaignDetailResponse> {
     throw new HttpError(404, "Campaign not found", `No campaign found with id ${id}`);
   }
 
-  const [onchain, donations] = await Promise.all([fetchOnchainCampaign(campaign), getPublicDonations(campaign.id)]);
+  const [onchain, donations, disbursements] = await Promise.all([
+    fetchOnchainCampaign(campaign),
+    getPublicDonations(campaign.id),
+    getPublicDisbursements(campaign.id),
+  ]);
 
-  return { ...toCampaignResponse(campaign), onchain, donations };
+  return { ...toCampaignResponse(campaign), onchain, donations, disbursements };
+}
+
+async function getPublicDisbursements(campaignId: string): Promise<PublicDisbursement[]> {
+  const disbursements = await prisma.disbursement.findMany({
+    where: { campaignId, status: "COMPLETED" },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return disbursements.map((disbursement) => {
+    const amountWei = disbursement.amountWei?.toFixed() ?? "0";
+
+    return {
+      amount_eth: weiToEth(amountWei),
+      amount_wei: amountWei,
+      description: disbursement.description,
+      proof_url: disbursement.proofUrl,
+      tx_hash: disbursement.txHashSepolia,
+      tx_url: disbursement.txHashSepolia ? getExplorerTxUrl(disbursement.txHashSepolia) : null,
+      transfer_tx_hash: disbursement.transferTxHash,
+      transfer_tx_url: disbursement.transferTxHash ? getExplorerTxUrl(disbursement.transferTxHash) : null,
+      disbursed_at: disbursement.updatedAt,
+    };
+  });
+}
+
+export async function closeCampaign(id: string, email: string): Promise<CampaignResponse> {
+  const campaign = await findCampaign(id);
+
+  if (campaign.initiator.email !== email) {
+    throw new HttpError(403, "Forbidden", "You can only manage your own campaigns");
+  }
+
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT id FROM campaigns WHERE id = ${id} FOR UPDATE`;
+
+      const locked = await tx.campaign.findUniqueOrThrow({ where: { id } });
+
+      if (locked.status !== CampaignStatus.ACTIVE) {
+        throw new HttpError(409, "Campaign not active", `Campaign with status ${locked.status} cannot be closed`);
+      }
+
+      const [donationsInProgress, disbursementsInProgress, disbursed] = await Promise.all([
+        tx.transaction.count({
+          where: { campaignId: id, type: "DONATION", status: { in: ["PENDING", "SETTLEMENT"] } },
+        }),
+        tx.disbursement.count({ where: { campaignId: id, status: { in: ["PENDING", "APPROVED"] } } }),
+        tx.disbursement.aggregate({
+          where: { campaignId: id, status: { in: ["COMPLETED", "ONCHAIN_FAILED"] } },
+          _sum: { amountWei: true },
+        }),
+      ]);
+
+      if (donationsInProgress > 0 || disbursementsInProgress > 0) {
+        throw new HttpError(
+          409,
+          "Campaign has transactions in progress",
+          "Wait until all donations and disbursements are processed or reviewed before closing",
+        );
+      }
+
+      const undisbursed = BigInt(locked.currentAmountWei.toFixed()) - BigInt(disbursed._sum.amountWei?.toFixed() ?? "0");
+
+      if (undisbursed > 0n) {
+        throw new HttpError(
+          409,
+          "Undisbursed funds remain",
+          `${weiToEth(undisbursed)} ETH has not been disbursed yet. Disburse it before closing, the contract does not allow disbursements after a campaign is closed`,
+        );
+      }
+
+      const { txHash } = await closeCampaignOnChain(locked.onchainId);
+
+      return toCampaignResponse(
+        await tx.campaign.update({
+          where: { id },
+          data: { status: CampaignStatus.COMPLETED, txHashClose: txHash },
+          include,
+        }),
+      );
+    },
+    { timeout: 60000 },
+  );
 }
 
 function anonymizeName(name: string): string {

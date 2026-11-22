@@ -129,7 +129,13 @@ export async function createDonation(
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM campaigns WHERE id = ${campaign.id} FOR UPDATE`;
 
-      const limit = await calculateLimit(tx, user, campaign, gasFee);
+      const locked = await tx.campaign.findUniqueOrThrow({ where: { id: campaign.id } });
+
+      if (locked.status !== CampaignStatus.ACTIVE) {
+        throw new HttpError(409, "Campaign not active", `Campaign with status ${locked.status} cannot receive donations`);
+      }
+
+      const limit = await calculateLimit(tx, user, locked, gasFee);
 
       if (limit.remainingTarget === 0n) {
         throw new HttpError(409, "Campaign target reached", "This campaign has already reached its target");

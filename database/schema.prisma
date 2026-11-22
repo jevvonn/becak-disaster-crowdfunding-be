@@ -46,6 +46,7 @@ enum DisbursementStatus {
   APPROVED
   REJECTED
   COMPLETED
+  FAILED
   ONCHAIN_FAILED
 
   @@map("disbursement_status")
@@ -135,6 +136,8 @@ model Disbursement {
   status          DisbursementStatus @default(PENDING)
   rejectionReason String?            @map("rejection_reason")
   txHashSepolia   String?            @unique @map("tx_hash_sepolia") @db.VarChar(66)
+  transferTxHash  String?            @unique @map("transfer_tx_hash") @db.VarChar(66)
+  failureReason   String?            @map("failure_reason")
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 

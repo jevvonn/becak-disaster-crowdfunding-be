@@ -132,6 +132,25 @@ export class CampaignController extends Controller {
     return successResponse("Campaign deleted successfully", null);
   }
 
+  @Patch("{id}/close")
+  @Security("jwt")
+  @Middlewares(requireRole(UserRole.INITIATOR))
+  @Response<ErrorResponse>(401, "Unauthorized")
+  @Response<ErrorResponse>(403, "Forbidden")
+  @Response<ErrorResponse>(404, "Campaign not found")
+  @Response<ErrorResponse>(409, "Campaign cannot be closed")
+  @Response<ErrorResponse>(502, "Blockchain transaction failed")
+  public async closeCampaign(
+    @Path() id: string,
+    @Request() request: AuthRequest,
+  ): Promise<ApiResponse<CampaignResponse>> {
+    const campaign = await campaignService.closeCampaign(
+      id,
+      request.user.email,
+    );
+    return successResponse("Campaign closed on-chain", campaign);
+  }
+
   @Patch("{id}/approve")
   @Security("jwt")
   @Middlewares(requireRole(UserRole.ADMIN))

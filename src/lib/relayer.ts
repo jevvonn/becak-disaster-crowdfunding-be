@@ -120,10 +120,19 @@ export async function getTransferGasFee(): Promise<bigint> {
   }
 }
 
-export function sendEthFromWallet(privateKey: string, to: string, valueWei: bigint) {
+export function sendEthFromWallet(privateKey: string, to: string, valueWei: bigint, sponsorGas = false) {
   const wallet = new Wallet(privateKey, getProvider());
 
   return enqueueForWallet(wallet.address, async () => {
+    if (sponsorGas) {
+      const [gasFee, balance] = await Promise.all([getTransferGasFee(), getEthBalance(wallet.address)]);
+      const shortfall = valueWei + gasFee - balance;
+
+      if (shortfall > 0n) {
+        await sendEth(wallet.address, shortfall);
+      }
+    }
+
     try {
       const tx = await wallet.sendTransaction({ to, value: valueWei, gasLimit: TRANSFER_GAS_LIMIT });
       const receipt = await tx.wait();
@@ -148,6 +157,20 @@ export interface RecordDonationParams {
 
 export function recordDonationOnChain({ campaignId, donorWallet, amountWei, orderId }: RecordDonationParams) {
   return sendTransaction("donateToCampaign", [campaignId, donorWallet, amountWei, orderId]);
+}
+
+export interface RecordDisbursementParams {
+  campaignId: bigint;
+  amountWei: bigint;
+  proofUrl: string;
+}
+
+export function recordDisbursementOnChain({ campaignId, amountWei, proofUrl }: RecordDisbursementParams) {
+  return sendTransaction("withdrawDisbursement", [campaignId, amountWei, proofUrl]);
+}
+
+export function closeCampaignOnChain(campaignId: bigint) {
+  return sendTransaction("closeCampaign", [campaignId]);
 }
 
 export async function getEthBalance(address: string): Promise<bigint> {

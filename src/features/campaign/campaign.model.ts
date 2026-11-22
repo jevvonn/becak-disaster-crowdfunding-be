@@ -107,7 +107,20 @@ export interface PublicDonation {
   donated_at: Date;
 }
 
+export interface PublicDisbursement {
+  amount_eth: string;
+  amount_wei: string;
+  description: string | null;
+  proof_url: string;
+  tx_hash: string | null;
+  tx_url: string | null;
+  transfer_tx_hash: string | null;
+  transfer_tx_url: string | null;
+  disbursed_at: Date;
+}
+
 export interface CampaignDetailResponse extends CampaignResponse {
   onchain: OnchainCampaign | null;
   donations: PublicDonation[];
+  disbursements: PublicDisbursement[];
 }

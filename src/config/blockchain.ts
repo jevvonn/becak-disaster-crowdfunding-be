@@ -6,7 +6,7 @@ let provider: JsonRpcProvider | undefined;
 let relayerSigner: NonceManager | undefined;
 
 export function getProvider(): JsonRpcProvider {
-  provider ??= new JsonRpcProvider(config.blockchain.rpcUrl);
+  provider ??= new JsonRpcProvider(config.blockchain.rpcUrl, undefined, { cacheTimeout: -1 });
   return provider;
 }
 

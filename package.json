@@ -2,7 +2,7 @@
   "name": "becak-be",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"nodemon\" \"nodemon -x tsoa spec-and-routes\"",
+    "dev": "concurrently \"nodemon\" \"npm run routes:watch\"",
     "build": "tsoa spec-and-routes && tsc",
     "start": "node build/src/server.js",
     "postinstall": "prisma generate",
@@ -10,7 +10,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "routes:watch": "nodemon --watch src --ext ts --exec \"tsoa spec-and-routes\""
   },
   "keywords": [],
   "author": "",
