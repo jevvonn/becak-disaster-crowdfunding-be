@@ -5,11 +5,7 @@ import { verifyToken } from "../lib/jwt";
 
 export type AuthRequest = Request & { user: AuthUser };
 
-export async function expressAuthentication(
-  request: Request,
-  securityName: string,
-  scopes: string[] = [],
-): Promise<AuthUser> {
+export async function expressAuthentication(request: Request, securityName: string): Promise<AuthUser> {
   if (securityName !== "jwt") {
     throw new HttpError(401, "Unauthorized", `Unknown security scheme: ${securityName}`);
   }
@@ -20,17 +16,9 @@ export async function expressAuthentication(
     throw new HttpError(401, "Unauthorized", "Missing or malformed Bearer token");
   }
 
-  let user: AuthUser;
-
   try {
-    user = verifyToken(token);
+    return verifyToken(token);
   } catch {
     throw new HttpError(401, "Unauthorized", "Invalid or expired token");
   }
-
-  if (scopes.length && !scopes.includes(user.role)) {
-    throw new HttpError(403, "Forbidden", "You do not have access to this resource");
-  }
-
-  return user;
 }

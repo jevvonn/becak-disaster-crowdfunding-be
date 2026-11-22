@@ -1,22 +1,11 @@
-import { User } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { HttpError } from "../../lib/http-error";
 import { signToken } from "../../lib/jwt";
 import { hashPassword, verifyPassword } from "../../lib/password";
 import { generateWallet } from "../../lib/wallet";
-import { LoginRequest, LoginResponse, RegisterRequest, UserResponse } from "./auth.model";
-
-function toUserResponse(user: User): UserResponse {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    wallet_address: user.walletAddress,
-    created_at: user.createdAt,
-    updated_at: user.updatedAt,
-  };
-}
+import { UserResponse, UserRole } from "../user/user.model";
+import { toUserResponse } from "../user/user.service";
+import { LoginRequest, LoginResponse, RegisterRequest } from "./auth.model";
 
 export async function register({ name, email, password }: RegisterRequest): Promise<UserResponse> {
   const normalizedEmail = email.trim().toLowerCase();
@@ -49,7 +38,7 @@ export async function login({ email, password }: LoginRequest): Promise<LoginRes
     throw new HttpError(401, "Invalid credentials", "Email or password is incorrect");
   }
 
-  const { token, expiresAt } = signToken(user);
+  const { token, expiresAt } = signToken({ email: user.email, name: user.name, role: user.role as UserRole });
 
   return { access_token: token, token_type: "Bearer", expires_at: expiresAt };
 }

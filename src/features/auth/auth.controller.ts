@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Post, Request, Response, Route, Security, SuccessResponse, Tags } from "tsoa";
 import { ApiResponse, ErrorResponse, successResponse } from "../../lib/response";
 import { AuthRequest } from "../../middlewares/authentication";
-import { LoginRequest, LoginResponse, RegisterRequest, UserResponse } from "./auth.model";
+import { UserResponse } from "../user/user.model";
+import { LoginRequest, LoginResponse, RegisterRequest } from "./auth.model";
 import * as authService from "./auth.service";
 
 @Route("auth")

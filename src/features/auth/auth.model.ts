@@ -1,4 +1,4 @@
-export type UserRole = "DONOR" | "INITIATOR" | "ADMIN";
+import { UserRole } from "../user/user.model";
 
 export interface AuthUser {
   email: string;
@@ -35,16 +35,6 @@ export interface LoginRequest {
    * @minLength 1 Password is required
    */
   password: string;
-}
-
-export interface UserResponse {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  wallet_address: string;
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface LoginResponse {
