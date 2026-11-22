@@ -1,0 +1,242 @@
+import { Campaign, Prisma, User } from "@prisma/client";
+import { getExplorerTxUrl } from "../../config/blockchain";
+import { prisma } from "../../config/prisma";
+import { ethToWei, weiToEth } from "../../lib/eth";
+import { HttpError } from "../../lib/http-error";
+import { createCampaignOnChain, getCampaignOnChain } from "../../lib/relayer";
+import { generateWallet } from "../../lib/wallet";
+import {
+  CampaignDetailResponse,
+  CampaignResponse,
+  CampaignStatus,
+  CreateCampaignRequest,
+  OnchainCampaign,
+  RejectCampaignRequest,
+  UpdateCampaignRequest,
+} from "./campaign.model";
+
+type CampaignWithInitiator = Campaign & { initiator: User };
+
+const include = { initiator: true } as const;
+const PUBLIC_STATUSES: CampaignStatus[] = [CampaignStatus.ACTIVE, CampaignStatus.COMPLETED];
+const EDITABLE_STATUSES: CampaignStatus[] = [CampaignStatus.PENDING, CampaignStatus.REJECTED];
+
+function toCampaignResponse(campaign: CampaignWithInitiator): CampaignResponse {
+  return {
+    id: campaign.id,
+    onchain_id: Number(campaign.onchainId),
+    title: campaign.title,
+    description: campaign.description,
+    image_url: campaign.imageUrl,
+    target_amount: weiToEth(campaign.targetAmountWei.toFixed()),
+    target_amount_wei: campaign.targetAmountWei.toFixed(),
+    current_amount: weiToEth(campaign.currentAmountWei.toFixed()),
+    current_amount_wei: campaign.currentAmountWei.toFixed(),
+    campaign_wallet: campaign.campaignWallet,
+    status: campaign.status as CampaignStatus,
+    rejection_reason: campaign.rejectionReason,
+    tx_hash_create: campaign.txHashCreate,
+    tx_hash_close: campaign.txHashClose,
+    initiator: {
+      id: campaign.initiator.id,
+      name: campaign.initiator.name,
+      wallet_address: campaign.initiator.walletAddress,
+    },
+    created_at: campaign.createdAt,
+    updated_at: campaign.updatedAt,
+  };
+}
+
+async function findCampaign(id: string): Promise<CampaignWithInitiator> {
+  const campaign = await prisma.campaign.findUnique({ where: { id }, include });
+
+  if (!campaign) {
+    throw new HttpError(404, "Campaign not found", `No campaign found with id ${id}`);
+  }
+
+  return campaign;
+}
+
+async function findOwnEditableCampaign(id: string, email: string): Promise<CampaignWithInitiator> {
+  const campaign = await findCampaign(id);
+
+  if (campaign.initiator.email !== email) {
+    throw new HttpError(403, "Forbidden", "You can only manage your own campaigns");
+  }
+
+  if (!EDITABLE_STATUSES.includes(campaign.status as CampaignStatus)) {
+    throw new HttpError(409, "Campaign is locked", `Campaign with status ${campaign.status} can no longer be changed`);
+  }
+
+  return campaign;
+}
+
+async function findPendingCampaign(id: string): Promise<CampaignWithInitiator> {
+  const campaign = await findCampaign(id);
+
+  if (campaign.status !== CampaignStatus.PENDING) {
+    throw new HttpError(409, "Campaign is not pending", `Campaign with status ${campaign.status} cannot be reviewed`);
+  }
+
+  return campaign;
+}
+
+async function fetchOnchainCampaign(campaign: Campaign): Promise<OnchainCampaign | null> {
+  try {
+    const onchain = await getCampaignOnChain(campaign.onchainId);
+
+    if (!onchain) {
+      return null;
+    }
+
+    return {
+      target_amount: weiToEth(onchain.targetAmount),
+      total_raised: weiToEth(onchain.totalRaised),
+      total_disbursed: weiToEth(onchain.totalDisbursed),
+      available_balance: weiToEth(onchain.availableBalance),
+      is_active: onchain.isActive,
+      tx_url_create: campaign.txHashCreate ? getExplorerTxUrl(campaign.txHashCreate) : null,
+    };
+  } catch (error) {
+    console.error("Failed to read campaign from chain", error);
+    return null;
+  }
+}
+
+export async function getPublicCampaigns(status?: CampaignStatus): Promise<CampaignResponse[]> {
+  const statuses = status ? PUBLIC_STATUSES.filter((s) => s === status) : PUBLIC_STATUSES;
+
+  const campaigns = await prisma.campaign.findMany({
+    where: { status: { in: statuses } },
+    include,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return campaigns.map(toCampaignResponse);
+}
+
+export async function getMyCampaigns(email: string): Promise<CampaignResponse[]> {
+  const campaigns = await prisma.campaign.findMany({
+    where: { initiator: { email } },
+    include,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return campaigns.map(toCampaignResponse);
+}
+
+export async function getAllCampaigns(status?: CampaignStatus): Promise<CampaignResponse[]> {
+  const campaigns = await prisma.campaign.findMany({
+    where: status ? { status } : {},
+    include,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return campaigns.map(toCampaignResponse);
+}
+
+export async function getCampaign(id: string): Promise<CampaignDetailResponse> {
+  const campaign = await findCampaign(id);
+
+  if (!PUBLIC_STATUSES.includes(campaign.status as CampaignStatus)) {
+    throw new HttpError(404, "Campaign not found", `No campaign found with id ${id}`);
+  }
+
+  return { ...toCampaignResponse(campaign), onchain: await fetchOnchainCampaign(campaign) };
+}
+
+export async function createCampaign(body: CreateCampaignRequest, email: string): Promise<CampaignResponse> {
+  const initiator = await prisma.user.findUniqueOrThrow({ where: { email } });
+  const wallet = generateWallet();
+
+  const campaign = await prisma.campaign.create({
+    data: {
+      title: body.title.trim(),
+      description: body.description.trim(),
+      imageUrl: body.image_url,
+      targetAmountWei: ethToWei(body.target_amount, "target_amount").toString(),
+      campaignWallet: wallet.address,
+      campaignWalletKeyEncrypted: wallet.privateKeyEncrypted,
+      initiatorId: initiator.id,
+    },
+    include,
+  });
+
+  return toCampaignResponse(campaign);
+}
+
+export async function updateCampaign(
+  id: string,
+  body: UpdateCampaignRequest,
+  email: string,
+): Promise<CampaignResponse> {
+  const campaign = await findOwnEditableCampaign(id, email);
+
+  const data: Prisma.CampaignUpdateInput = {
+    title: body.title?.trim(),
+    description: body.description?.trim(),
+    imageUrl: body.image_url,
+    targetAmountWei:
+      body.target_amount === undefined ? undefined : ethToWei(body.target_amount, "target_amount").toString(),
+  };
+
+  if (campaign.status === CampaignStatus.REJECTED) {
+    data.status = CampaignStatus.PENDING;
+    data.rejectionReason = null;
+  }
+
+  const updated = await prisma.campaign.update({ where: { id }, data, include });
+
+  return toCampaignResponse(updated);
+}
+
+export async function deleteCampaign(id: string, email: string): Promise<void> {
+  await findOwnEditableCampaign(id, email);
+  await prisma.campaign.delete({ where: { id } });
+}
+
+export async function approveCampaign(id: string): Promise<CampaignResponse> {
+  const campaign = await findPendingCampaign(id);
+
+  let txHashCreate = campaign.txHashCreate;
+  const onchain = await getCampaignOnChain(campaign.onchainId);
+
+  if (onchain && onchain.campaignWallet.toLowerCase() !== campaign.campaignWallet.toLowerCase()) {
+    throw new HttpError(
+      409,
+      "On-chain ID conflict",
+      `On-chain campaign ${campaign.onchainId} is already registered to a different campaign`,
+    );
+  }
+
+  if (!onchain) {
+    const result = await createCampaignOnChain({
+      campaignId: campaign.onchainId,
+      title: campaign.title,
+      initiatorWallet: campaign.initiator.walletAddress,
+      campaignWallet: campaign.campaignWallet,
+      targetAmount: BigInt(campaign.targetAmountWei.toFixed()),
+    });
+    txHashCreate = result.txHash;
+  }
+
+  const updated = await prisma.campaign.update({
+    where: { id },
+    data: { status: CampaignStatus.ACTIVE, rejectionReason: null, txHashCreate },
+    include,
+  });
+
+  return toCampaignResponse(updated);
+}
+
+export async function rejectCampaign(id: string, { reason }: RejectCampaignRequest): Promise<CampaignResponse> {
+  await findPendingCampaign(id);
+
+  const updated = await prisma.campaign.update({
+    where: { id },
+    data: { status: CampaignStatus.REJECTED, rejectionReason: reason.trim() },
+    include,
+  });
+
+  return toCampaignResponse(updated);
+}
