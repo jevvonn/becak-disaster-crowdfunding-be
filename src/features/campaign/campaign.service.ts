@@ -137,20 +137,31 @@ export async function getAllCampaigns(status?: CampaignStatus): Promise<Campaign
   return campaigns.map(toCampaignResponse);
 }
 
-export async function getCampaign(id: string): Promise<CampaignDetailResponse> {
+async function findPublicCampaign(id: string): Promise<CampaignWithInitiator> {
   const campaign = await findCampaign(id);
 
   if (!PUBLIC_STATUSES.includes(campaign.status as CampaignStatus)) {
     throw new HttpError(404, "Campaign not found", `No campaign found with id ${id}`);
   }
 
-  const [onchain, donations, disbursements] = await Promise.all([
-    fetchOnchainCampaign(campaign),
-    getPublicDonations(campaign.id),
-    getPublicDisbursements(campaign.id),
-  ]);
+  return campaign;
+}
 
-  return { ...toCampaignResponse(campaign), onchain, donations, disbursements };
+export async function getCampaign(id: string): Promise<CampaignDetailResponse> {
+  const campaign = await findPublicCampaign(id);
+  const onchain = await fetchOnchainCampaign(campaign);
+
+  return { ...toCampaignResponse(campaign), onchain };
+}
+
+export async function getCampaignDisbursements(id: string): Promise<PublicDisbursement[]> {
+  const campaign = await findPublicCampaign(id);
+  return getPublicDisbursements(campaign.id);
+}
+
+export async function getCampaignDonaturs(id: string): Promise<PublicDonation[]> {
+  const campaign = await findPublicCampaign(id);
+  return getPublicDonations(campaign.id);
 }
 
 async function getPublicDisbursements(campaignId: string): Promise<PublicDisbursement[]> {

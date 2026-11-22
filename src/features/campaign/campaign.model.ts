@@ -121,6 +121,4 @@ export interface PublicDisbursement {
 
 export interface CampaignDetailResponse extends CampaignResponse {
   onchain: OnchainCampaign | null;
-  donations: PublicDonation[];
-  disbursements: PublicDisbursement[];
 }

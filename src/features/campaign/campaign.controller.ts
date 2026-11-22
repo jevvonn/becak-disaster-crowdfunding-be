@@ -28,6 +28,8 @@ import {
   CampaignResponse,
   CampaignStatus,
   CreateCampaignRequest,
+  PublicDisbursement,
+  PublicDonation,
   RejectCampaignRequest,
   UpdateCampaignRequest,
 } from "./campaign.model";
@@ -75,6 +77,24 @@ export class CampaignController extends Controller {
   ): Promise<ApiResponse<CampaignDetailResponse>> {
     const campaign = await campaignService.getCampaign(id);
     return successResponse("Campaign retrieved successfully", campaign);
+  }
+
+  @Get("{id}/donaturs")
+  @Response<ErrorResponse>(404, "Campaign not found")
+  public async getCampaignDonaturs(
+    @Path() id: string,
+  ): Promise<ApiResponse<PublicDonation[]>> {
+    const donaturs = await campaignService.getCampaignDonaturs(id);
+    return successResponse("Donaturs retrieved successfully", donaturs);
+  }
+
+  @Get("{id}/disbursements")
+  @Response<ErrorResponse>(404, "Campaign not found")
+  public async getCampaignDisbursements(
+    @Path() id: string,
+  ): Promise<ApiResponse<PublicDisbursement[]>> {
+    const disbursements = await campaignService.getCampaignDisbursements(id);
+    return successResponse("Disbursements retrieved successfully", disbursements);
   }
 
   @Post()
