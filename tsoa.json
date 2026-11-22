@@ -4,9 +4,19 @@
   "controllerPathGlobs": ["src/features/**/*.controller.ts"],
   "spec": {
     "outputDirectory": "build",
-    "specVersion": 3
+    "specVersion": 3,
+    "basePath": "/api/v1",
+    "securityDefinitions": {
+      "jwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
   },
   "routes": {
-    "routesDir": "build"
+    "routesDir": "build",
+    "basePath": "/api/v1",
+    "authenticationModule": "./src/middlewares/authentication.ts"
   }
 }

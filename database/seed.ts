@@ -1,9 +1,11 @@
 import { hashPassword } from "../src/lib/password";
+import { generateWallet } from "../src/lib/wallet";
 import { config } from "../src/config/config";
 import { prisma } from "../src/config/prisma";
 
 async function main() {
   const { email, password } = config.defaultAdmin;
+  const wallet = generateWallet();
 
   const admin = await prisma.user.upsert({
     where: { email },
@@ -13,8 +15,8 @@ async function main() {
       email,
       password: await hashPassword(password),
       role: "ADMIN",
-      walletAddress: "0x0000000000000000000000000000000000000000",
-      privateKeyEncrypted: "",
+      walletAddress: wallet.address,
+      privateKeyEncrypted: wallet.privateKeyEncrypted,
     },
   });
 

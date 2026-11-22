@@ -13,6 +13,17 @@ export const config = {
     name: process.env.DB_NAME || "",
     url: process.env.DB_URL || "",
   },
+  jwt: {
+    secret: process.env.JWT_SECRET || "",
+    expiresIn: process.env.JWT_EXPIRES_IN || "3h",
+  },
+  blockchain: {
+    rpcUrl: process.env.SEPOLIA_RPC_URL || "",
+    contractAddress: process.env.CONTRACT_ADDRESS || "",
+    relayerPrivateKey: process.env.RELAYER_PRIVATE_KEY || "",
+    walletEncryptionKey: process.env.WALLET_ENCRYPTION_KEY || "",
+    explorerBaseUrl: process.env.EXPLORER_BASE_URL || "https://sepolia.etherscan.io",
+  },
   defaultAdmin: {
     email: process.env.DEFAULT_ADMIN_EMAIL || "",
     password: process.env.DEFAULT_ADMIN_PASSWORD || "",
