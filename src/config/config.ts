@@ -33,6 +33,12 @@ export const config = {
   exchange: {
     idrPerEth: BigInt(process.env.IDR_PER_ETH || "10000000"),
   },
+  redis: {
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+  },
+  coinGecko: {
+    apiKey: process.env.COIN_GECKO_API_KEY || "",
+  },
   defaultAdmin: {
     email: process.env.DEFAULT_ADMIN_EMAIL || "",
     password: process.env.DEFAULT_ADMIN_PASSWORD || "",

@@ -1,5 +1,5 @@
 import { formatEther, parseEther } from "ethers";
-import { config } from "../config/config";
+import { getIdrPerEth } from "./exchange-rate";
 import { HttpError } from "./http-error";
 
 const WEI_PER_ETH = 10n ** 18n;
@@ -18,10 +18,10 @@ export function weiToEth(wei: bigint | string): string {
   return formatEther(wei);
 }
 
-export function idrToWei(idr: bigint | number): bigint {
-  return (BigInt(idr) * WEI_PER_ETH) / config.exchange.idrPerEth;
+export async function idrToWei(idr: bigint | number): Promise<bigint> {
+  return (BigInt(idr) * WEI_PER_ETH) / (await getIdrPerEth());
 }
 
-export function weiToIdr(wei: bigint | string): number {
-  return Number((BigInt(wei) * config.exchange.idrPerEth) / WEI_PER_ETH);
+export async function weiToIdr(wei: bigint | string): Promise<number> {
+  return Number((BigInt(wei) * (await getIdrPerEth())) / WEI_PER_ETH);
 }

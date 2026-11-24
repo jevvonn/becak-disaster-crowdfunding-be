@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
-import { config } from "../../config/config";
 import { prisma } from "../../config/prisma";
 import { idrToWei, weiToEth, weiToIdr } from "../../lib/eth";
+import { getIdrPerEth } from "../../lib/exchange-rate";
 import { HttpError } from "../../lib/http-error";
 import { createPaymentLink } from "../../lib/midtrans";
 import { getEthBalance } from "../../lib/relayer";
@@ -11,20 +11,20 @@ import { TopupRequest, WalletResponse } from "./wallet.model";
 
 export async function getWallet(email: string): Promise<WalletResponse> {
   const user = await prisma.user.findUniqueOrThrow({ where: { email } });
-  const balanceWei = await getEthBalance(user.walletAddress);
+  const [balanceWei, idrPerEth] = await Promise.all([getEthBalance(user.walletAddress), getIdrPerEth()]);
 
   return {
     wallet_address: user.walletAddress,
     balance_eth: weiToEth(balanceWei),
     balance_wei: balanceWei.toString(),
-    balance_idr: weiToIdr(balanceWei),
-    idr_per_eth: Number(config.exchange.idrPerEth),
+    balance_idr: await weiToIdr(balanceWei),
+    idr_per_eth: Number(idrPerEth),
   };
 }
 
 export async function createTopup({ amount }: TopupRequest, email: string): Promise<TransactionResponse> {
   const user = await prisma.user.findUniqueOrThrow({ where: { email } });
-  const amountWei = idrToWei(amount);
+  const amountWei = await idrToWei(amount);
 
   const transaction = await prisma.transaction.create({
     data: {

@@ -5,6 +5,7 @@ import { errorHandler, notFoundHandler } from "./middlewares/error-handler";
 
 export const app = express();
 
+app.set("trust proxy", 1);
 app.use(urlencoded({ extended: true }));
 app.use(json());
 

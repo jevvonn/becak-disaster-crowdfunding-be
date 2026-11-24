@@ -122,7 +122,7 @@ export async function createDonation(
     throw new HttpError(409, "Campaign not active on-chain", "This campaign cannot receive donations on-chain");
   }
 
-  const gasFee = await getTransferGasFee();
+  const [gasFee, amountIdr] = await Promise.all([getTransferGasFee(), weiToIdr(amountWei)]);
 
   const transaction = await prisma.$transaction(
     async (tx) => {
@@ -162,7 +162,7 @@ export async function createDonation(
           type: TransactionType.DONATION,
           userId: user.id,
           campaignId: campaign.id,
-          amount: weiToIdr(amountWei),
+          amount: amountIdr,
           amountWei: amountWei.toString(),
           paymentType: "ETH_WALLET",
         },

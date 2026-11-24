@@ -122,6 +122,8 @@ export async function createDisbursement(body: CreateDisbursementRequest, email:
     throw new HttpError(409, "Campaign not active on-chain", "This campaign cannot disburse funds on-chain");
   }
 
+  const amountIdr = await weiToIdr(amountWei);
+
   const disbursement = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM campaigns WHERE id = ${campaign.id} FOR UPDATE`;
 
@@ -143,7 +145,7 @@ export async function createDisbursement(body: CreateDisbursementRequest, email:
       data: {
         campaignId: campaign.id,
         requestedById: campaign.initiatorId,
-        amount: weiToIdr(amountWei),
+        amount: amountIdr,
         amountWei: amountWei.toString(),
         description: body.description?.trim() || null,
         proofUrl: body.proof_url,
